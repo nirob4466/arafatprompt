@@ -41,7 +41,8 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({ onGenerateStart, o
             const generatedTexts = await generatePromptsFromImage(base64Data, imageFile.type, apiKey);
             const newPrompts = generatedTexts.map(text => ({
                 id: crypto.randomUUID(),
-                text: text
+                text: text,
+                isFavorite: false
             }));
             onGenerateComplete(newPrompts);
         } catch (err) {
@@ -66,7 +67,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({ onGenerateStart, o
             {imageBase64 && (
                  <button
                     onClick={handleGenerate}
-                    className="w-full bg-brand-yellow text-bg-primary font-bold text-lg py-3.5 px-4 rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-glow shadow-brand-glow animate-glow-pulse"
+                    className="w-full bg-brand-accent text-bg-primary font-bold text-lg py-3.5 px-4 rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-accent-glow shadow-brand-accent-glow animate-glow-pulse"
                 >
                     Generate Prompts from Image
                 </button>

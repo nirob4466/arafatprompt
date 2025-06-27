@@ -56,7 +56,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, ima
 
   return (
     <div 
-      className={`w-full h-80 flex flex-col justify-center items-center p-6 border-2 border-dashed rounded-xl transition-all duration-300 cursor-pointer ${isDragging ? 'border-brand-yellow bg-brand-yellow/10 scale-105' : 'border-white/20 hover:border-text-secondary'}`}
+      className={`w-full h-80 flex flex-col justify-center items-center p-6 border-2 border-dashed rounded-xl transition-all duration-300 cursor-pointer ${isDragging ? 'border-brand-accent bg-brand-accent/10 scale-105' : 'border-white/20 hover:border-text-secondary'}`}
       onDragEnter={(e) => handleDrag(e, true)}
       onDragLeave={(e) => handleDrag(e, false)}
       onDragOver={(e) => handleDrag(e, true)}

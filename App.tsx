@@ -1,14 +1,16 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AiPromptGenerator } from './components/AiPromptGenerator';
 import { ImageToPrompt } from './components/ImageToPrompt';
 import { PromptDisplay } from './components/PromptDisplay';
 import { SettingsModal } from './components/SettingsModal';
+import { SplashScreen } from './components/SplashScreen';
 import { CreativePrompt } from './types';
+import { PromptEditorModal } from './components/PromptEditorModal';
 
 type Mode = 'ai' | 'image';
 
-const useLocalStorage = (key: string, initialValue: string): [string, (value: string | ((val: string) => string)) => void] => {
-  const [storedValue, setStoredValue] = useState(() => {
+const useLocalStorage = <T,>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] => {
+  const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
@@ -18,7 +20,7 @@ const useLocalStorage = (key: string, initialValue: string): [string, (value: st
     }
   });
 
-  const setValue = (value: string | ((val: string) => string)) => {
+  const setValue = (value: T | ((val: T) => T)) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -34,7 +36,7 @@ const Header: React.FC<{ onSettingsClick: () => void }> = ({ onSettingsClick }) 
     <header className="flex justify-between items-center">
         <div>
             <h1 className="text-3xl md:text-4xl font-black text-text-primary tracking-wide flex items-center gap-3">
-                <span className="text-brand-yellow">⚡</span>
+                <span className="text-brand-accent">⚡</span>
                 Arafat Prompt V2.4 Deep
             </h1>
             <p className="mt-1 text-md text-text-secondary">Crafting Aesthetic AI Wallpaper Prompts</p>
@@ -52,13 +54,13 @@ const ModeToggle: React.FC<{ mode: Mode; onModeChange: (mode: Mode) => void; }> 
     <div className="flex items-center bg-black/20 rounded-full p-1 shadow-inner w-full max-w-lg mx-auto border border-white/5">
         <button
             onClick={() => onModeChange('ai')}
-            className={`w-1/2 py-2.5 rounded-full font-bold text-lg transition-all duration-300 ${mode === 'ai' ? 'bg-brand-yellow text-bg-primary shadow-md' : 'text-text-secondary hover:bg-white/5'}`}
+            className={`w-1/2 py-2.5 rounded-full font-bold text-lg transition-all duration-300 ${mode === 'ai' ? 'bg-brand-accent text-bg-primary shadow-md' : 'text-text-secondary hover:bg-white/5'}`}
         >
             AI Prompt Generator
         </button>
         <button
             onClick={() => onModeChange('image')}
-            className={`w-1/2 py-2.5 rounded-full font-bold text-lg transition-all duration-300 ${mode === 'image' ? 'bg-brand-yellow text-bg-primary shadow-md' : 'text-text-secondary hover:bg-white/5'}`}
+            className={`w-1/2 py-2.5 rounded-full font-bold text-lg transition-all duration-300 ${mode === 'image' ? 'bg-brand-accent text-bg-primary shadow-md' : 'text-text-secondary hover:bg-white/5'}`}
         >
             Image to Prompt
         </button>
@@ -72,20 +74,33 @@ const Footer: React.FC = () => (
 );
 
 const App: React.FC = () => {
+  const [isAppStarted, setIsAppStarted] = useState(false);
   const [mode, setMode] = useState<Mode>('ai');
   const [prompts, setPrompts] = useState<CreativePrompt[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [promptToEdit, setPromptToEdit] = useState<CreativePrompt | null>(null);
+
   const [geminiApiKey, setGeminiApiKey] = useLocalStorage('gemini_api_key', '');
   const [openRouterApiKey, setOpenRouterApiKey] = useLocalStorage('open_router_api_key', '');
-
+  const [theme, setTheme] = useLocalStorage('app_theme', 'yellow');
+  const [favorites, setFavorites] = useLocalStorage<CreativePrompt[]>('app_favorites', []);
+  const [history, setHistory] = useLocalStorage<CreativePrompt[][]>('app_history', []);
+  
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const handleClear = useCallback(() => {
     setPrompts([]);
     setError(null);
     setIsLoading(false);
   }, []);
+  
+  const handleAppStart = () => setIsAppStarted(true);
 
   const handleModeChange = (newMode: Mode) => {
     if(mode !== newMode) {
@@ -101,7 +116,9 @@ const App: React.FC = () => {
   };
 
   const handleGenerationComplete = (newPrompts: CreativePrompt[]) => {
-    setPrompts(newPrompts);
+    const freshPrompts = newPrompts.map(p => ({ ...p, isFavorite: false }));
+    setPrompts(freshPrompts);
+    setHistory(prev => [freshPrompts, ...prev].slice(0, 10));
     setIsLoading(false);
   };
 
@@ -109,57 +126,103 @@ const App: React.FC = () => {
     setError(errorMessage);
     setIsLoading(false);
   };
+  
+  const handleToggleFavorite = (promptToToggle: CreativePrompt) => {
+    const updatedPrompt = { ...promptToToggle, isFavorite: !promptToToggle.isFavorite };
+
+    setPrompts(prev => prev.map(p => p.id === promptToToggle.id ? updatedPrompt : p));
+    setHistory(prev => prev.map(batch => batch.map(p => p.id === promptToToggle.id ? updatedPrompt : p)));
+
+    if (updatedPrompt.isFavorite) {
+        setFavorites(prev => [...prev, updatedPrompt]);
+    } else {
+        setFavorites(prev => prev.filter(p => p.id !== promptToToggle.id));
+    }
+  };
+  
+  const handleEditPrompt = (prompt: CreativePrompt) => {
+    setPromptToEdit(prompt);
+    setIsEditorOpen(true);
+  };
+
+  const handleUpdatePrompt = (promptId: string, newText: string) => {
+      const updateFn = (p: CreativePrompt) => p.id === promptId ? { ...p, text: newText } : p;
+      setPrompts(prev => prev.map(updateFn));
+      setFavorites(prev => prev.map(updateFn));
+      setHistory(prev => prev.map(batch => batch.map(updateFn)));
+      setIsEditorOpen(false);
+      setPromptToEdit(null);
+  };
 
   return (
-    <div className="min-h-screen text-text-primary p-4 sm:p-6 lg:p-8 animate-fade-in">
-      <div className="max-w-7xl mx-auto">
-        <SettingsModal 
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            geminiApiKey={geminiApiKey}
-            setGeminiApiKey={setGeminiApiKey}
-            openRouterApiKey={openRouterApiKey}
-            setOpenRouterApiKey={setOpenRouterApiKey}
-        />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="lg:col-span-2">
-                <Header onSettingsClick={() => setIsSettingsOpen(true)} />
-            </div>
-
-            <div className="space-y-6 lg:sticky top-8 self-start">
-                <ModeToggle mode={mode} onModeChange={handleModeChange} />
-                <div className="bg-surface/50 backdrop-blur-xl p-6 md:p-8 rounded-2xl shadow-lg border border-white/10">
-                    {mode === 'ai' ? (
-                        <AiPromptGenerator
-                            onGenerateStart={handleGenerationStart}
-                            onGenerateComplete={handleGenerationComplete}
-                            onGenerateError={handleGenerationError}
-                            apiKey={openRouterApiKey}
-                        />
-                    ) : (
-                        <ImageToPrompt
-                            onGenerateStart={handleGenerationStart}
-                            onGenerateComplete={handleGenerationComplete}
-                            onGenerateError={handleGenerationError}
-                            onClear={handleClear}
-                            apiKey={geminiApiKey}
-                        />
-                    )}
-                </div>
-            </div>
-            
-            <div className="lg:row-start-2">
-                <PromptDisplay 
-                    prompts={prompts}
-                    isLoading={isLoading}
-                    error={error}
-                    currentMode={mode}
+    <div className="min-h-screen text-text-primary">
+      {!isAppStarted ? (
+        <SplashScreen onStarted={handleAppStart} />
+      ) : (
+        <>
+            <PromptEditorModal
+                isOpen={isEditorOpen}
+                onClose={() => setIsEditorOpen(false)}
+                prompt={promptToEdit}
+                onSave={handleUpdatePrompt}
+            />
+            <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">
+              <div className="max-w-7xl mx-auto">
+                <SettingsModal 
+                    isOpen={isSettingsOpen}
+                    onClose={() => setIsSettingsOpen(false)}
+                    geminiApiKey={geminiApiKey}
+                    setGeminiApiKey={setGeminiApiKey}
+                    openRouterApiKey={openRouterApiKey}
+                    setOpenRouterApiKey={setOpenRouterApiKey}
+                    theme={theme}
+                    setTheme={setTheme}
                 />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="lg:col-span-2">
+                        <Header onSettingsClick={() => setIsSettingsOpen(true)} />
+                    </div>
+
+                    <div className="space-y-6 lg:sticky top-8 self-start">
+                        <ModeToggle mode={mode} onModeChange={handleModeChange} />
+                        <div className="bg-surface/50 backdrop-blur-xl p-6 md:p-8 rounded-2xl shadow-lg border border-white/10">
+                            {mode === 'ai' ? (
+                                <AiPromptGenerator
+                                    onGenerateStart={handleGenerationStart}
+                                    onGenerateComplete={handleGenerationComplete}
+                                    onGenerateError={handleGenerationError}
+                                    apiKey={openRouterApiKey}
+                                />
+                            ) : (
+                                <ImageToPrompt
+                                    onGenerateStart={handleGenerationStart}
+                                    onGenerateComplete={handleGenerationComplete}
+                                    onGenerateError={handleGenerationError}
+                                    onClear={handleClear}
+                                    apiKey={geminiApiKey}
+                                />
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="lg:row-start-2">
+                        <PromptDisplay 
+                            prompts={prompts}
+                            favorites={favorites}
+                            history={history}
+                            isLoading={isLoading}
+                            error={error}
+                            onToggleFavorite={handleToggleFavorite}
+                            onEditPrompt={handleEditPrompt}
+                        />
+                    </div>
+                    
+                    <Footer />
+                </div>
+              </div>
             </div>
-            
-            <Footer />
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

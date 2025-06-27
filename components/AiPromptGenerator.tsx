@@ -36,7 +36,7 @@ const visualStyles = ["Anime", "Photorealistic", "3D Render", "Impressionistic",
 const SelectInput: React.FC<{ label: string; value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; options: string[] }> = ({ label, value, onChange, options }) => (
     <div className="flex-1">
         <label className="block text-sm font-medium text-text-secondary mb-2">{label}</label>
-        <select value={value} onChange={onChange} className="w-full bg-black/25 text-text-primary p-3 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-brand-yellow transition-all">
+        <select value={value} onChange={onChange} className="w-full bg-black/25 text-text-primary p-3 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-brand-accent transition-all">
             {options.map(option => <option key={option} value={option} className="bg-bg-secondary">{option}</option>)}
         </select>
     </div>
@@ -50,7 +50,7 @@ const ToggleSwitch: React.FC<{ label: string; description: string; enabled: bool
         </div>
         <button
             onClick={() => setEnabled(!enabled)}
-            className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ${enabled ? 'bg-brand-yellow' : 'bg-black/40'}`}
+            className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 ${enabled ? 'bg-brand-accent' : 'bg-black/40'}`}
         >
             <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
@@ -70,7 +70,7 @@ export const AiPromptGenerator: React.FC<AiPromptGeneratorProps> = ({ onGenerate
         onGenerateStart();
         try {
             const results = await generateWallpaperPrompts(category, visualStyle, isOled, apiKey);
-            const newPrompts = results.map(text => ({ id: crypto.randomUUID(), text }));
+            const newPrompts = results.map(text => ({ id: crypto.randomUUID(), text, isFavorite: false }));
             onGenerateComplete(newPrompts);
         } catch (err) {
             onGenerateError(err instanceof Error ? err.message : "An unknown error occurred.");
@@ -91,7 +91,7 @@ export const AiPromptGenerator: React.FC<AiPromptGeneratorProps> = ({ onGenerate
             />
             <button
                 onClick={handleGenerate}
-                className="w-full bg-brand-yellow text-bg-primary font-bold text-lg py-3.5 px-4 rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-glow shadow-brand-glow animate-glow-pulse"
+                className="w-full bg-brand-accent text-bg-primary font-bold text-lg py-3.5 px-4 rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-brand-accent-glow shadow-brand-accent-glow animate-glow-pulse"
             >
                 Generate Prompts
             </button>

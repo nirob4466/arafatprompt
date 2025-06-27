@@ -1,55 +1,19 @@
 import React, { useState } from 'react';
 import { Loader } from './Loader';
 import { CreativePrompt } from '../types';
+import { PromptItem } from './PromptItem';
 
 interface PromptDisplayProps {
   prompts: CreativePrompt[];
+  favorites: CreativePrompt[];
+  history: CreativePrompt[][];
   isLoading: boolean;
   error: string | null;
-  currentMode: 'ai' | 'image';
+  onToggleFavorite: (prompt: CreativePrompt) => void;
+  onEditPrompt: (prompt: CreativePrompt) => void;
 }
 
-const CopyIcon: React.FC<{ copied: boolean }> = ({ copied }) => {
-    if (copied) {
-        return (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-        );
-    }
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary group-hover:text-text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-    );
-};
-
-const PromptItem: React.FC<{ prompt: CreativePrompt; index: number }> = ({ prompt, index }) => {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(prompt.text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
-    };
-
-    return (
-        <li
-            className="bg-white/5 border border-white/10 p-4 rounded-lg flex items-start gap-4 animate-slide-in-up shadow-sm transition-all hover:border-brand-yellow/50 hover:bg-white/10"
-            style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'backwards' }}
-        >
-            <span className="text-sm font-bold text-text-secondary mt-1">#{index + 1}</span>
-            <p className="text-text-primary flex-1">{prompt.text}</p>
-            <button
-                onClick={handleCopy}
-                className="group bg-black/20 hover:bg-black/40 p-2 rounded-md transition-all duration-200 flex-shrink-0"
-                aria-label="Copy prompt"
-            >
-                <CopyIcon copied={copied} />
-            </button>
-        </li>
-    );
-};
+type Tab = 'generated' | 'favorites' | 'history';
 
 const InitialState: React.FC = () => (
     <div className="flex flex-col items-center justify-center h-full text-center text-text-placeholder p-10 bg-surface/50 backdrop-blur-xl rounded-2xl border border-dashed border-white/20">
@@ -58,6 +22,13 @@ const InitialState: React.FC = () => (
          </svg>
         <h3 className="text-xl font-bold text-text-secondary">Ready to Spark Creativity?</h3>
         <p className="mt-2 max-w-sm">Select your preferences on the left and click "Generate" to conjure up some magical prompts!</p>
+    </div>
+);
+
+const EmptyState: React.FC<{ title: string; message: string }> = ({ title, message }) => (
+    <div className="flex flex-col items-center justify-center text-center text-text-placeholder p-10">
+         <h3 className="text-xl font-bold text-text-secondary">{title}</h3>
+         <p className="mt-2 max-w-sm">{message}</p>
     </div>
 );
 
@@ -71,31 +42,78 @@ const ErrorState: React.FC<{ message: string }> = ({ message }) => (
     </div>
 );
 
-export const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompts, isLoading, error, currentMode }) => {
-    if (isLoading) {
-        return <Loader />;
-    }
 
-    if (error) {
-        return <ErrorState message={error} />;
-    }
-    
-    if (prompts.length === 0) {
-        return <InitialState />;
-    }
+const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+    <button 
+        onClick={onClick}
+        className={`px-4 py-2 font-semibold rounded-md transition-colors text-sm ${active ? 'bg-brand-accent text-bg-primary' : 'text-text-secondary hover:bg-white/10'}`}
+    >
+        {children}
+    </button>
+);
+
+
+export const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompts, favorites, history, isLoading, error, onToggleFavorite, onEditPrompt }) => {
+    const [activeTab, setActiveTab] = useState<Tab>('generated');
+
+    const renderContent = () => {
+        if (isLoading) return <Loader />;
+        if (error) return <ErrorState message={error} />;
+
+        if (activeTab === 'generated') {
+            if (prompts.length === 0) return <InitialState />;
+            return (
+                <ul className="flex flex-col h-full space-y-3">
+                    {prompts.map((prompt, index) => (
+                        <PromptItem key={prompt.id} prompt={prompt} index={index} onToggleFavorite={onToggleFavorite} onEdit={onEditPrompt} />
+                    ))}
+                </ul>
+            );
+        }
+
+        if (activeTab === 'favorites') {
+            if (favorites.length === 0) return <EmptyState title="No Favorites Yet" message="Click the star icon on a prompt to save it here." />;
+            return (
+                 <ul className="flex flex-col h-full space-y-3">
+                    {favorites.map((prompt, index) => (
+                        <PromptItem key={prompt.id} prompt={prompt} index={index} onToggleFavorite={onToggleFavorite} onEdit={onEditPrompt} />
+                    ))}
+                </ul>
+            );
+        }
+
+        if (activeTab === 'history') {
+             if (history.length === 0) return <EmptyState title="No History Found" message="Generated prompts will appear here for you to revisit." />;
+            return (
+                <div className="flex flex-col h-full space-y-6">
+                    {history.map((batch, batchIndex) => (
+                        <div key={batchIndex}>
+                            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Generation #{history.length - batchIndex}</h3>
+                            <ul className="space-y-3">
+                                {batch.map((prompt, promptIndex) => (
+                                    <PromptItem key={prompt.id} prompt={prompt} index={promptIndex} onToggleFavorite={onToggleFavorite} onEdit={onEditPrompt} />
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+    };
 
     return (
-        <div className="bg-surface/50 backdrop-blur-xl p-4 sm:p-6 rounded-2xl border border-white/10 shadow-lg h-full">
-            <h2 className="text-2xl font-bold text-text-primary mb-4">Generated Prompts</h2>
-            <ul className="flex flex-col h-full space-y-3">
-                {prompts.map((prompt, index) => (
-                    <PromptItem
-                        key={prompt.id}
-                        prompt={prompt}
-                        index={index}
-                    />
-                ))}
-            </ul>
+        <div className="bg-surface/50 backdrop-blur-xl p-4 sm:p-6 rounded-2xl border border-white/10 shadow-lg h-full min-h-[500px] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-text-primary">Results</h2>
+                <div className="flex items-center space-x-2 bg-black/20 p-1 rounded-lg">
+                    <TabButton active={activeTab === 'generated'} onClick={() => setActiveTab('generated')}>Generated</TabButton>
+                    <TabButton active={activeTab === 'favorites'} onClick={() => setActiveTab('favorites')}>Favorites</TabButton>
+                    <TabButton active={activeTab === 'history'} onClick={() => setActiveTab('history')}>History</TabButton>
+                </div>
+            </div>
+            <div className="flex-grow overflow-y-auto pr-2 -mr-2">
+                 {renderContent()}
+            </div>
         </div>
     );
 };
